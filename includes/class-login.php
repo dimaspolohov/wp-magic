@@ -119,10 +119,11 @@ class Magic_Login
                     'status' => 401,
                 )
             );
+            return false;
         }
 
-        $token = $this->validate_token(); # Call token validation
-        if($token){
+        try{
+            $this->validate_token(true); # Call token validation
             if( ( $user_data = get_user_by( 'email', $this->user_email ) ) ) { # Get existing user
                 return $user_data->data->ID;
             }else{
@@ -133,15 +134,17 @@ class Magic_Login
                         'status' => 403,
                     )
                 );
+                return false;
             }
-        }else{
+        }catch (Exception $e){
             $this->token_error = new WP_Error(
                 'magic_invalid_token',
-                __('Magic token is invalid', 'magic'),
+                $e->getMessage(),
                 array(
                     'status' => 401,
                 )
             );
+            return false;
         }
 
         /** Auth have the errors*/
@@ -334,13 +337,14 @@ class Magic_Login
      * Validate did token
      *
      * Check did token and define user email for REST API access
+     * @param boolean $rest
      * @return boolean
      * @todo fix signature
      *
      * @since 0.0.0
      * @access public
      */
-    public function validate_token()
+    public function validate_token($rest = false)
     {
         $token = $this->getHeadersAuthorization();
         if($token){ // Check exist authorization field in header
@@ -367,14 +371,23 @@ class Magic_Login
                 }
             } catch (\MagicAdmin\Exception\DIDTokenException $e) {
                 $this->log( $e->getMessage() );
+                if($rest){
+                    throw new Exception($e->getMessage());
+                }
                 return false;
             } catch (\MagicAdmin\Exception\RequestException $e) {
                 $this->log( $e->getMessage() );
+                if($rest){
+                    throw new Exception($e->getMessage());
+                }
                 return false;
             }
         }else{
 	        $this->log( 'Failed to receive authorization header' );
 	        $this->log( print_r(apache_request_headers(), true) );
+            if($rest){
+                throw new Exception('Failed to receive authorization header');
+            }
 	        return false;
         }
     }
